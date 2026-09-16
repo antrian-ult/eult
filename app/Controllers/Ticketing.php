@@ -170,8 +170,8 @@ class Ticketing extends BaseController
         }
 
         $data                  = $this->getMaster($this->pathPage . $this->pageIndex);
-        $data['isProduksi']    = strpos($this->pengguna['susrSgroupNama'], 'PRODUKSI');
-        $data['isVerifikator'] = strpos($this->pengguna['susrSgroupNama'], 'VERIFIKATOR');
+        $data['isProduksi']    = strpos($this->pengguna['susrSgroupNama'], 'PRODUKSI') !== false;
+        $data['isVerifikator'] = strpos($this->pengguna['susrSgroupNama'], 'VERIFIKATOR') !== false;
         $data['sgroup']        = $this->tiket->ambilSatu('s_user_group_unit', ['sgroupunitSgroupNama' => $this->pengguna['susrSgroupNama'], 'sgroupunitIsHome >' => 0]);
         $data['user_group']    = $sesi['susrSgroupNama'];
         $data['datas']         = $datas;
@@ -266,8 +266,14 @@ class Ticketing extends BaseController
             'r_priority'  => $this->tiket->tabelRef('r_priority'),
         ];
 
-        if ($this->pengguna['susrSgroupNama'] !== 'ADMIN' || $this->pengguna['susrSgroupNama'] !== 'OPERATOR') {
-            $pengguna        = $this->tiket->ambilSatu('s_user_group', ['sgroupNama' => $this->pengguna['susrSgroupNama']]);
+        // Kondisi lama (negasi ADMIN dipisahkan ATAU logis dengan negasi
+        // OPERATOR) selalu bernilai true. Maksud sebenarnya: keperluan hanya
+        // dimuat untuk grup unit (bukan ADMIN/OPERATOR), konsisten dengan
+        // response() dan bolehAksesTiket().
+        $grup = (string) ($this->pengguna['susrSgroupNama'] ?? '');
+
+        if ($grup !== 'ADMIN' && strpos($grup, 'OPERATOR') === false) {
+            $pengguna        = $this->tiket->ambilSatu('s_user_group', ['sgroupNama' => $grup]);
             $data['keperluan'] = $pengguna !== false ? $this->tiket->tabelRef('r_category_sub', ['sCatCategoryId' => $pengguna['sgroupCategoryId']]) : false;
         }
 
@@ -278,7 +284,8 @@ class Ticketing extends BaseController
     {
         $terbuka         = $this->tiketTerotorisasi($kunci);
         $datas           = $this->tiket->byId(['ticketTrackingId' => $terbuka]);
-        $pengguna        = $this->tiket->ambilSatu('s_user_group', ['sgroupNama' => $this->pengguna['susrSgroupNama']]);
+        $grup            = (string) ($this->pengguna['susrSgroupNama'] ?? '');
+        $pengguna        = $this->tiket->ambilSatu('s_user_group', ['sgroupNama' => $grup]);
         $arsip           = $this->tiket->ambilSatu('d_archive', ['archiveTrackingId' => $terbuka, 'archiveJenis' => 'TIKET']);
         $data            = [
             'page_judul'  => 'Tiket Unit Layanan Terpadu',
@@ -287,7 +294,7 @@ class Ticketing extends BaseController
             'datas'       => $datas,
             's_user'      => $this->tiket->tabelRef('s_user'),
             'r_category'  => $this->tiket->tabelRef('r_category'),
-            'keperluan'   => ($this->pengguna['susrSgroupNama'] !== 'ADMIN' || $this->pengguna['susrSgroupNama'] !== 'OPERATOR') && $pengguna !== false
+            'keperluan'   => $grup !== 'ADMIN' && strpos($grup, 'OPERATOR') === false && $pengguna !== false
                 ? $this->tiket->tabelRef('r_category_sub', ['sCatCategoryId' => $pengguna['sgroupCategoryId']])
                 : null,
             'layanan'     => $this->tiket->getLayanan(),
@@ -378,6 +385,13 @@ class Ticketing extends BaseController
             $param['suratTujuan'] = $tujuan;
         }
 
+        // r_surat dan d_ticketing harus berubah bersama: surat tersimpan
+        // tanpa status tiket tercatat (atau sebaliknya) meninggalkan tiket
+        // setengah terproses. Transaksi controller ini menumpuk aman di
+        // atas transaksi per-write di ModelMaster (nesting CI4 otomatis).
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
+
         if (empty($idLama)) {
             $proses = $this->tiket->tambah('r_surat', $param)
                 && $this->tiket->ubah('d_ticketing', ['ticketSuratCreated' => date('Y-m-d H:i:s')], ['ticketTrackingId' => $idSurat]);
@@ -385,6 +399,8 @@ class Ticketing extends BaseController
             $proses = $this->tiket->ubah('r_surat', $param, ['suratId' => $idLama])
                 && $this->tiket->ubah('d_ticketing', ['ticketStatus' => 3, 'ticketSuratCreated' => date('Y-m-d H:i:s')], ['ticketTrackingId' => $idSurat]);
         }
+
+        $db->transComplete();
 
         if ($proses) {
             eult_save_history('Surat Telah Dibuat Oleh ' . $this->pengguna['susrProfil'] . ' dan Tiket Menunggu Persetujuan Unit ' . $namaUnit, (string) $idSurat);
@@ -565,8 +581,12 @@ class Ticketing extends BaseController
         }
 
         $pekerja = $this->tiket->getTicketAssign('s_unit', ['unitId' => $tujuanUnit]);
-        $proses  = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama])
+
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
+        $proses = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama])
             && $this->tiket->tambah('d_disposisi', $paramDisposisi);
+        $db->transComplete();
 
         if ($proses) {
             $namaUnit = $pekerja !== false ? $pekerja['unitNama'] . '(' . $pekerja['parentUnitNama'] . ')' : '';
@@ -669,9 +689,13 @@ class Ticketing extends BaseController
             'disposisiTanggal'  => (($terakhir !== false) ? $terakhir['disposisiTanggal'] : '00'),
         ];
 
+        // Tiket, disposisi lama (ditutup), dan disposisi baru harus atomik.
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
         $proses = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama])
             && $this->tiket->ubah('d_disposisi', ['disposisiIsTrue' => 1, 'disposisiTanggalAkhir' => date('Y-m-d H:i:s')], $kunciLama)
             && $this->tiket->tambah('d_disposisi', $paramDisposisi);
+        $db->transComplete();
 
         if ($proses) {
             eult_save_history('Surat Telah Diparaf Oleh Kepala Unit ' . $pekerjaLama['unitNama'] . '(' . $pekerjaLama['parentUnitNama'] . ') dan Tiket Telah diserahkan Kepada Unit ' . $pekerja['unitNama'] . '(' . $pekerja['parentUnitNama'] . ') oleh ' . $this->pengguna['susrProfil'], $idLama);
@@ -736,9 +760,14 @@ class Ticketing extends BaseController
             'disposisiTanggal'  => (($terakhir !== false) ? $terakhir['disposisiTanggal'] : '00'),
         ];
 
+        // Status tiket, penutupan disposisi, dan data pejabat surat tiga
+        // write yang harus terjadi bersama-sama.
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
         $proses = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama])
             && $this->tiket->ubah('d_disposisi', ['disposisiIsTrue' => 1, 'disposisiTanggalAkhir' => date('Y-m-d H:i:s')], $kunciLama)
             && $this->tiket->ubah('r_surat', $paramSurat, ['suratTrackingId' => $idLama]);
+        $db->transComplete();
 
         if ($proses) {
             eult_save_history('Surat Telah Ditandatangani Oleh ' . ($pekerja['unitPejabatNama'] ?? '') . '(' . ($pekerja['unitPejabatJabatan'] ?? '') . ') . Permintaan menunggu persetujuan validasi oleh operator.', $idLama);
@@ -772,7 +801,6 @@ class Ticketing extends BaseController
         $data['output_url']   = $output !== false ? site_url($this->controllerName . '/loadpdf') . '/' . $output['archiveFile'] : false;
         $data['history']      = $this->tiket->getHistory((string) $id);
         $data['save_url']     = site_url($this->controllerName . '/save_replies') . '/';
-        $data['close_url']    = site_url($this->controllerName . '/close') . '/' . $kunci;
         $data['load_attach']  = site_url($this->controllerName . '/loadattach');
         $data['replies']      = $this->tiket->getReplies('d_replies', ['repliesTicketId' => $id]);
         $data['user_group']   = $this->pengguna;
@@ -786,12 +814,19 @@ class Ticketing extends BaseController
 
     public function rating()
     {
-        $rating     = $this->request->getPost('rating');
-        $nomorTiket = $this->tiketMentahTerotorisasi((string) $this->request->getPost('nomorTiket'));
+        $rating = $this->request->getPost('rating');
+        // Nomor tiket dari teks halaman bisa terbawa whitespace markup —
+        // pangkas agar cocok eksak dengan ticketTrackingId di database.
+        $nomorTiket = $this->tiketMentahTerotorisasi(trim((string) $this->request->getPost('nomorTiket')));
         $param      = ['ratingNilai' => $rating, 'ratingTicketId' => $nomorTiket];
 
         $datas = $this->tiket->byId(['ticketTrackingId' => $nomorTiket]);
-        $cek   = $this->tiket->ambilSatu('d_rating', ['ratingTicketId' => $nomorTiket]);
+
+        if ($datas === false) {
+            eult_message_kirim('Tiket tidak ditemukan.', 'error');
+        }
+
+        $cek = $this->tiket->ambilSatu('d_rating', ['ratingTicketId' => $nomorTiket]);
 
         $proses = empty($cek)
             ? $this->tiket->tambah('d_rating', $param)
@@ -803,12 +838,14 @@ class Ticketing extends BaseController
             ->get()->getRowArray() ?? false;
         $lampiran = $output !== false ? $output['archiveFile'] : false;
 
-        if ($datas !== false) {
-            $this->email->selesai((string) $datas['ticketEmail'], 'Berkas Permintaan EULT UNMUL #' . $nomorTiket, $datas, $lampiran);
-        }
+        $terkirim = $this->email->selesai((string) $datas['ticketEmail'], 'Berkas Permintaan EULT UNMUL #' . $nomorTiket, $datas, $lampiran);
 
         if ($proses) {
-            eult_message_kirim('Terimakasih Telah Mengisi IKM, Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon Periksa Email Anda.', 'success');
+            if ($terkirim) {
+                eult_message_kirim('Terimakasih Telah Mengisi IKM, Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon Periksa Email Anda.', 'success');
+            }
+
+            eult_message_kirim('Penilaian tersimpan, tetapi berkas gagal dikirim via email. Silakan hubungi petugas.', 'error');
         }
 
         eult_message_kirim('Rating gagal disimpan.', 'error');
@@ -913,8 +950,11 @@ class Ticketing extends BaseController
                 [$idTiket, $namaBerkas] = [$gabung[0], $gabung[1]];
             }
 
+            $db = $this->tiket->dbAktif();
+            $db->transStart();
             $proses = $this->tiket->ubah('d_ticketing', ['ticketStatus' => 5, 'ticketIsValidasi' => 1], ['ticketTrackingId' => $idTiket])
                 && $this->tiket->ubah('r_surat', ['suratNomor' => $nomorSurat, 'suratNomorTanggal' => date('Y-m-d')], ['suratTrackingId' => $idTiket]);
+            $db->transComplete();
 
             if (! $proses) {
                 $galat = $this->tiket->dbAktif()->error();
@@ -934,12 +974,16 @@ class Ticketing extends BaseController
         $terbuka       = $this->tiketTerotorisasi($kunci);
         $noPemohon     = (string) $this->request->getPost('ns_pemohon');
         $tglPemohon    = (string) $this->request->getPost('ts_pemohon');
-        $noSurat       = (string) $this->request->getPost('ns_pengantar');
-        $bank          = (string) $this->request->getPost('bank');
-        $namaPejabat   = 'Enny Fathurachmi, S.IP., M.Si';
-        $nipPejabat    = '197611172002122001';
-        $jabatanPejabat = 'Koordinator Unit Layanan Terpadu';
+        $noSurat        = (string) $this->request->getPost('ns_pengantar');
+        $bank           = (string) $this->request->getPost('bank');
+        // Data pejabat penandatangan EKTMI dapat dioverride via .env
+        // (EULT_EKTMI_PEJABAT_*) tanpa mengubah kode saat terjadi pergantian.
+        $namaPejabat    = (string) (env('EULT_EKTMI_PEJABAT_NAMA') ?: 'Enny Fathurachmi, S.IP., M.Si');
+        $nipPejabat     = (string) (env('EULT_EKTMI_PEJABAT_NIP') ?: '197611172002122001');
+        $jabatanPejabat = (string) (env('EULT_EKTMI_PEJABAT_JABATAN') ?: 'Koordinator Unit Layanan Terpadu');
 
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
         $proses = $this->tiket->ubah('d_ticketing', ['ticketStatus' => 5, 'ticketIsValidasi' => 1], ['ticketTrackingId' => $terbuka])
             && $this->tiket->tambah('r_surat', [
                 'suratNomor'          => $noSurat,
@@ -952,6 +996,7 @@ class Ticketing extends BaseController
                 'suratPejabatJabatan' => $jabatanPejabat,
                 'suratBank'           => $bank,
             ]);
+        $db->transComplete();
 
         // Gagal simpan harus berhenti DI SINI: riwayat, baris d_archive, QR
         // dan berkas PDF adalah efek samping yang tidak boleh ditulis untuk
@@ -1087,53 +1132,68 @@ class Ticketing extends BaseController
             eult_message_kirim('Ooops!! Something Wrong!!', 'error');
         }
 
-        $idLama = (string) $this->request->getPost('ticketIdOld');
+        $idLama   = (string) $this->request->getPost('ticketIdOld');
+        $kodeAcak = $idLama === '' ? eult_generate_kode() : '';
 
+        // Alokasi nomor + insert dikunci per kode acak: dua permintaan
+        // bersamaan dengan kode sama bisa membaca urutan terakhir yang
+        // sama (read-then-write) dan menghasilkan ticketTrackingId ganda.
         if ($idLama === '') {
-            $kodeAcak = eult_generate_kode();
-            $cek      = $this->tiket->getNumber($kodeAcak);
-            $idTiket  = empty($cek)
-                ? $kodeAcak . '-' . sprintf('%03d', 1)
-                : $kodeAcak . '-' . sprintf('%03d', (int) substr((string) $cek['ticketTrackingId'], -3) + 1);
-        } else {
-            $idTiket = $this->tiketMentahTerotorisasi($idLama);
+            $this->tiket->kunciNomorTiket($kodeAcak);
         }
 
-        $arsipId = eult_auto_increment('d_archive', 'archiveId', str_replace('-', '', $idTiket), ['archiveTrackingId' => $idTiket]);
+        try {
+            $idTiket = $idLama === ''
+                ? $this->tiket->nomorTiketBerikutnya($kodeAcak)
+                : $this->tiketMentahTerotorisasi($idLama);
 
-        $paramFile = ['archiveId' => $arsipId, 'archiveTrackingId' => $idTiket, 'archiveJenis' => 'TIKET'];
-        $param     = [
-            'ticketIdentitas'  => (string) $this->request->getPost('ticketIdentitas'),
-            'ticketName'       => (string) $this->request->getPost('ticketName'),
-            'ticketCategories' => (string) $this->request->getPost('ticketCategories'),
-            'ticketEmail'      => (string) $this->request->getPost('ticketEmail'),
-            'ticketNoHp'       => (string) $this->request->getPost('ticketNoHp'),
-            'ticketSubject'    => (string) $this->request->getPost('ticketSubject'),
-            'ticketPriority'   => (string) $this->request->getPost('ticketPriority'),
-            'ticketMessage'    => (string) $this->request->getPost('ticketMessage'),
-            'ticketCreated'    => date('Y-m-d H:i:s'),
-            'ticketStatus'     => 1,
-            'ticketCreatedBy'  => $this->pengguna['susrProfil'],
-            'ticketArchiveId'  => $arsipId,
-        ];
+            $arsipId = eult_auto_increment('d_archive', 'archiveId', str_replace('-', '', $idTiket), ['archiveTrackingId' => $idTiket]);
 
-        if ($idLama === '') {
-            $param['ticketTrackingId'] = $idTiket;
-            $proses                    = $this->tiket->tambah('d_ticketing', $param);
+            $paramFile = ['archiveId' => $arsipId, 'archiveTrackingId' => $idTiket, 'archiveJenis' => 'TIKET'];
+            $param     = [
+                'ticketIdentitas'  => (string) $this->request->getPost('ticketIdentitas'),
+                'ticketName'       => (string) $this->request->getPost('ticketName'),
+                'ticketCategories' => (string) $this->request->getPost('ticketCategories'),
+                'ticketEmail'      => (string) $this->request->getPost('ticketEmail'),
+                'ticketNoHp'       => (string) $this->request->getPost('ticketNoHp'),
+                'ticketSubject'    => (string) $this->request->getPost('ticketSubject'),
+                'ticketPriority'   => (string) $this->request->getPost('ticketPriority'),
+                'ticketMessage'    => (string) $this->request->getPost('ticketMessage'),
+                'ticketCreated'    => date('Y-m-d H:i:s'),
+                'ticketStatus'     => 1,
+                'ticketCreatedBy'  => $this->pengguna['susrProfil'],
+                'ticketArchiveId'  => $arsipId,
+            ];
+
+            if ($idLama === '') {
+                $param['ticketTrackingId'] = $idTiket;
+                $proses                    = $this->tiket->tambah('d_ticketing', $param);
+            } else {
+                $param['ticketUpdated']   = date('Y-m-d H:i:s');
+                $param['ticketUpdatedBy'] = $this->pengguna['susrProfil'];
+                $proses                   = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama]);
+            }
+        } finally {
+            if ($idLama === '') {
+                $this->tiket->lepasKunciNomorTiket($kodeAcak);
+            }
+        }
+
+        // Riwayat, email, dan unggahan hanya boleh ditulis bila baris
+        // tiketnya benar-benar tersimpan (sebelumnya ditulis walau insert
+        // gagal).
+        if (! empty($proses) && $idLama === '') {
             eult_save_history('Tiket Telah Dibuat Oleh ' . $this->pengguna['susrProfil'], $idTiket);
 
             $datas = $this->tiket->byId(['ticketTrackingId' => $idTiket]);
             if ($datas !== false) {
                 $this->email->buat((string) $datas['ticketEmail'], 'Tiket EULT UNMUL #' . $idTiket, $datas);
             }
-        } else {
-            $param['ticketUpdated']   = date('Y-m-d H:i:s');
-            $param['ticketUpdatedBy'] = $this->pengguna['susrProfil'];
-            $proses                   = $this->tiket->ubah('d_ticketing', $param, ['ticketTrackingId' => $idLama]);
+        } elseif (! empty($proses)) {
             eult_save_history('Tiket Telah Diubah Oleh ' . $this->pengguna['susrProfil'], $idTiket);
         }
 
-        if ($this->request->getFile('ticketArchiveId') !== null && $this->request->getFile('ticketArchiveId')->getError() !== UPLOAD_ERR_NO_FILE) {
+        if (! empty($proses) && $this->request->getFile('ticketArchiveId') !== null && $this->request->getFile('ticketArchiveId')->getError() !== UPLOAD_ERR_NO_FILE) {
             eult_upload_ticket([
                 'url'      => WRITEPATH . 'uploads/ticketing/',
                 'type'     => 'pdf',
@@ -1165,17 +1225,20 @@ class Ticketing extends BaseController
             }
         }
 
+        // Seluruh baris terkait tiket dihapus dalam satu transaksi; file
+        // fisik dihapus lebih dulu di luar transaksi (unlink tidak bisa
+        // di-rollback, dan baris d_archive yang hilang cukup menandai
+        // berkas yatim bila transaksi gagal).
+        $db = $this->tiket->dbAktif();
+        $db->transStart();
         $proses = $this->tiket->hapus('d_history', ['ticketTrackingIdHistory' => $terbuka])
             && $this->tiket->hapus('d_replies', ['repliesTicketId' => $terbuka])
             && $this->tiket->hapus('d_archive', ['archiveTrackingId' => $terbuka])
-            && $this->tiket->hapus('d_disposisi', ['disposisiTicketId' => $terbuka]);
+            && $this->tiket->hapus('d_disposisi', ['disposisiTicketId' => $terbuka])
+            && $this->tiket->hapus('d_ticketing', ['ticketTrackingId' => $terbuka]);
+        $db->transComplete();
 
-        $proses2 = false;
-        if ($proses) {
-            $proses2 = $this->tiket->hapus('d_ticketing', ['ticketTrackingId' => $terbuka]);
-        }
-
-        if (! empty($proses2)) {
+        if (! empty($proses)) {
             eult_message_kirim($this->judul . ' Berhasil Dihapus', 'success');
         }
 

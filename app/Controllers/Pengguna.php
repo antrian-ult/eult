@@ -111,13 +111,28 @@ class Pengguna extends BaseController
     {
         $kunci ??= (string) $this->request->getPost('key');
         $terbuka = $this->enkripsi->decode($kunci);
-        $proses  = $this->pengguna->hapus('s_user', ['susrNama' => $terbuka]);
 
-        if (! empty($proses)) {
+        if (! is_string($terbuka) || $terbuka === '') {
+            eult_message_kirim('Kunci pengguna tidak valid.', 'error');
+        }
+
+        if ($this->pengguna->byId(['susrNama' => $terbuka]) === false) {
+            eult_message_kirim($this->judul . ' tidak ditemukan.', 'error');
+        }
+
+        // FK s_user_group_user ON DELETE RESTRICT: hapus baris anak dulu
+        // dalam satu transaksi agar tidak yatim bila salah satu gagal.
+        $db = $this->pengguna->dbAktif();
+        $db->transStart();
+        $anak  = $this->pengguna->hapus('s_user_group_user', ['sgroupSusrNama' => $terbuka]);
+        $induk = $anak ? $this->pengguna->hapus('s_user', ['susrNama' => $terbuka]) : false;
+        $db->transComplete();
+
+        if ($db->transStatus() && ! empty($induk)) {
             eult_message_kirim($this->judul . ' Berhasil Dihapus', 'success');
         }
 
-        $galat = $this->pengguna->dbAktif()->error();
+        $galat = $db->error();
         eult_message_kirim($this->judul . ' Gagal Dihapus, ' . ($galat['code'] ?? '') . ': ' . ($galat['message'] ?? ''), 'error');
     }
 
@@ -125,7 +140,16 @@ class Pengguna extends BaseController
     {
         $kunci ??= (string) $this->request->getPost('key');
         $terbuka = $this->enkripsi->decode($kunci);
-        $sandi   = eult_generate_password();
+
+        if (! is_string($terbuka) || $terbuka === '') {
+            eult_message_kirim('Kunci pengguna tidak valid.', 'error');
+        }
+
+        if ($this->pengguna->byId(['susrNama' => $terbuka]) === false) {
+            eult_message_kirim($this->judul . ' tidak ditemukan.', 'error');
+        }
+
+        $sandi = eult_generate_password();
 
         $proses = $this->pengguna->ubah('s_user', ['susrPassword' => password_hash($sandi, PASSWORD_DEFAULT)], ['susrNama' => $terbuka]);
 

@@ -28,19 +28,31 @@ class PengirimEmail
     }
 
     /**
+     * Subjek dibersihkan dari CR/LF sebagai defense-in-depth terhadap
+     * email header injection — saat ini seluruh pemanggil memakai subjek
+     * buatan server, tetapi nilai apa pun yang lewat sini tidak boleh
+     * sampai ke header dalam bentuk mentah.
+     */
+    private function subjekBersih(string $subjek): string
+    {
+        return trim((string) preg_replace('/[\r\n]+/', ' ', $subjek));
+    }
+
+    /**
      * Mengirim email HTML generik.
      */
     public function kirimText(string $email, string $subjek, string $pesan): bool
     {
         $emailService = Services::email();
         $konfig       = $this->konfigurasi();
+        $subjek       = $this->subjekBersih($subjek);
 
         $emailService->setFrom($konfig['dari'], $konfig['nama']);
         $emailService->setTo($email);
         $emailService->setSubject($subjek);
         $emailService->setMessage($pesan);
 
-        return $emailService->send();
+        return $this->kirim($emailService, $email, $subjek);
     }
 
     /**
@@ -50,6 +62,7 @@ class PengirimEmail
     {
         $emailService = Services::email();
         $konfig       = $this->konfigurasi();
+        $subjek       = $this->subjekBersih($subjek);
 
         $emailService->setFrom($konfig['dari'], $konfig['nama']);
         $emailService->setTo($email);
@@ -64,7 +77,27 @@ class PengirimEmail
 
         $emailService->setMessage($pesan);
 
-        return $emailService->send();
+        return $this->kirim($emailService, $email, $subjek);
+    }
+
+    /**
+     * Pengiriman tunggal: kegagalan send() wajib tercatat di log agar
+     * gangguan SMTP tidak hilang diam-diam (seluruh pemanggil selama ini
+     * mengabaikan nilai kembaliannya).
+     */
+    private function kirim(\CodeIgniter\Email\Email $emailService, string $email, string $subjek): bool
+    {
+        $terkirim = $emailService->send();
+
+        if (! $terkirim) {
+            log_message('error', 'Gagal mengirim email ke {email} dengan subjek {subjek}: {debug}', [
+                'email'   => $email,
+                'subjek'  => $subjek,
+                'debug'   => $emailService->printDebugger(['headers', 'subject']),
+            ]);
+        }
+
+        return $terkirim;
     }
 
     /**

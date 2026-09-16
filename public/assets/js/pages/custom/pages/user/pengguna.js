@@ -3,11 +3,35 @@
 // Class Definition
 var FormCustom = function() {
 
+    var bacaRespons = function(data) {
+        try {
+            return (typeof data === 'string' ? JSON.parse(data) : data);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    var pesanGalat = function(xhr) {
+        var res = xhr && xhr.responseText ? bacaRespons(xhr.responseText) : null;
+        if (res && res.message) {
+            return String(res.message).replace(/<[^>]*>/g, '');
+        }
+        if (xhr && xhr.status === 403) {
+            return 'Sesi keamanan kedaluwarsa. Silakan muat ulang halaman dan coba lagi.';
+        }
+        return 'Terjadi gangguan. Silakan muat ulang halaman dan coba lagi.';
+    }
+
     var handleClickDelete = function() {
-        $(".ts_remove_row").click(function(e) {
+        // Delegasi ke document: tabel dipaginasi DataTables sehingga baris
+        // yang muncul belakangan (cari/halaman/urut) tidak ada saat binding
+        // langsung. Lepas binding langsung warisan dulu agar tidak ganda
+        // (form-submit-general.js global juga mengikat kelas yang sama).
+        $(".ts_remove_row").off('click');
+        $(document).off('click.penggunaDelete', '.ts_remove_row').on('click.penggunaDelete', '.ts_remove_row', function(e) {
             e.preventDefault();
-            var idLink = '#'+$(this).attr('id');
-            
+            var href = $(this).attr('href');
+
             swal.fire({
                 title: "Apakah Anda Yakin Akan Hapus Data?",
                 text: "Data Tidak Dapat Dikembalikan!!",
@@ -15,23 +39,37 @@ var FormCustom = function() {
                 showCancelButton: !0,
                 confirmButtonText: "Yes, Hapus!"
             }).then(function(e) {
-                e.value && 
-                    $.ajax(
+                if (!e.value) {
+                    return;
+                }
+                $.ajax(
+                {
+                    type: 'POST',
+                    url: href,
+                    success:function(data)
                     {
-                        type: 'POST',
-                        url:$(idLink).attr('href'),
-                        success:function(data) 
-                        {
-                            var res = (typeof data === 'string' ? JSON.parse(data) : data);
-                            $('#response').fadeIn('slow').html(res.response);
+                        var res = bacaRespons(data);
+                        if (!res) {
+                            swal.fire({title: "Sesi Berakhir", text: "Sesi Anda telah berakhir. Silakan muat ulang halaman dan masuk kembali.", type: "warning"});
+                            return;
+                        }
+                        $('#response').fadeIn('slow').html(res.response);
+                        if (res.status === 'success') {
                             swal.fire({title: "Deleted!", text: res.message, type: res.status}).then(
-                                function(){ 
+                                function(){
                                     location.reload();
                                 }
-                            ) ;                   
+                            ) ;
+                            return;
                         }
-                    });
-            })    
+                        swal.fire({title: "Gagal!", text: res.message, type: "error"});
+                    },
+                    error:function(xhr)
+                    {
+                        swal.fire({title: "Gagal!", text: pesanGalat(xhr), type: "error"});
+                    }
+                });
+            })
         });
     }
 
@@ -39,6 +77,11 @@ var FormCustom = function() {
         $('#response').html('');
         var button = $('#btn_save');
         var button_text = button.text();
+        var pulihkanTombol = function() {
+            button.prop("disabled", false);
+            button.removeClass('disabled');
+            button.text(button_text);
+        };
         button.prop( "disabled", true );
         button.addClass('disabled');
         button.text('Sedang Memproses...');
@@ -47,7 +90,14 @@ var FormCustom = function() {
             url: $(form).attr('action'),
             data: $(form).serialize(),
             success: function(data) {
-                var res = (typeof data === 'string' ? JSON.parse(data) : data);
+                // Respons non-JSON (mis. halaman login 302/HTML) tidak boleh
+                // meledakkan JSON.parse — tangani sebagai sesi berakhir.
+                var res = bacaRespons(data);
+                pulihkanTombol();
+                if (!res) {
+                    swal.fire({title: "Sesi Berakhir", text: "Sesi Anda telah berakhir. Silakan muat ulang halaman dan masuk kembali.", type: "warning"});
+                    return;
+                }
                 $('#response').fadeIn('slow').html(res.response);
                 swal.fire({
                     position: "top-right",
@@ -56,9 +106,10 @@ var FormCustom = function() {
                     showConfirmButton: !1,
                     timer: 1500
                 })
-                button.prop( "disabled", false );
-                button.removeClass('disabled');
-                button.text(button_text);  
+            },
+            error: function(xhr) {
+                pulihkanTombol();
+                swal.fire({title: "Gagal!", text: pesanGalat(xhr), type: "error"});
             }
         })
     }
@@ -85,9 +136,11 @@ var FormCustom = function() {
     }
 
     var handleResetPassword = function() {
-        $(".ts_reset_row").click(function(e) {
+        // Delegasi ke document (alasan sama dengan hapus di atas).
+        $(".ts_reset_row").off('click');
+        $(document).off('click.penggunaReset', '.ts_reset_row').on('click.penggunaReset', '.ts_reset_row', function(e) {
             e.preventDefault();
-            var idLink = '#'+$(this).attr('id');
+            var href = $(this).attr('href');
             swal.fire({
                 title: "Apakah Anda Yakin Akan Reset Password?",
                 text: "Data Tidak Dapat Dikembalikan!!",
@@ -95,19 +148,29 @@ var FormCustom = function() {
                 showCancelButton: !0,
                 confirmButtonText: "Yes, Reset!"
             }).then(function(e) {
-                e.value && 
-                    $.ajax(
+                if (!e.value) {
+                    return;
+                }
+                $.ajax(
+                {
+                    type: 'POST',
+                    url: href,
+                    success:function(data)
                     {
-                        type: 'POST',
-                        url:$(idLink).attr('href'),
-                        success:function(data) 
-                        {
-                            var res = (typeof data === 'string' ? JSON.parse(data) : data);
-                            $('#response').fadeIn('slow').html(res.response);
-                            swal.fire("Reset!", res.message, res.status) ;                   
+                        var res = bacaRespons(data);
+                        if (!res) {
+                            swal.fire({title: "Sesi Berakhir", text: "Sesi Anda telah berakhir. Silakan muat ulang halaman dan masuk kembali.", type: "warning"});
+                            return;
                         }
-                    });
-            })    
+                        $('#response').fadeIn('slow').html(res.response);
+                        swal.fire("Reset!", String(res.message).replace(/<[^>]*>/g, ''), res.status) ;
+                    },
+                    error:function(xhr)
+                    {
+                        swal.fire({title: "Gagal!", text: pesanGalat(xhr), type: "error"});
+                    }
+                });
+            })
         })
     }
 

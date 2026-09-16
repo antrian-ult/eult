@@ -171,12 +171,12 @@ License: You must have a valid license purchased only from themeforest(the above
 	<!--begin::Base Scripts -->
 	<script src="<?= base_url(); ?>assets/plugins/global/plugins.bundle.js" type="text/javascript"></script>
 	<script src="<?= base_url(); ?>assets/js/scripts.bundle.js" type="text/javascript"></script>
-	<script src="<?= base_url(); ?>assets/js/pages/eult-csrf.js?v=<?= date('YmdHis') ?>" type="text/javascript"></script>
+	<script src="<?= base_url(); ?>assets/js/pages/eult-csrf.js?v=<?= eult_versi_aset('assets/js/pages/eult-csrf.js') ?>" type="text/javascript"></script>
 	<script src="<?= base_url(); ?>assets/plugins/custom/tinymce/tinymce.bundle.js" type="text/javascript"></script>
 	<!--begin::Page Vendors -->
 	<script src="<?= base_url(); ?>assets/plugins/custom/fullcalendar/fullcalendar.bundle.js" type="text/javascript"></script>
 	<script src="<?= base_url(); ?>assets/plugins/custom/datatables/datatables.bundle.js" type="text/javascript"></script>
-	<script src="<?= base_url(); ?>assets/js/pages/eult-datatable.js?v=<?= date('YmdHis') ?>" type="text/javascript"></script>
+	<script src="<?= base_url(); ?>assets/js/pages/eult-datatable.js?v=<?= eult_versi_aset('assets/js/pages/eult-datatable.js') ?>" type="text/javascript"></script>
 	<!--end::Page Vendors -->
 	<!--begin::Page Snippets -->
 	<script src="<?= base_url(); ?>assets/plugins/custom/flot/flot.bundle.js" type="text/javascript"></script>
@@ -204,7 +204,7 @@ License: You must have a valid license purchased only from themeforest(the above
 		<!--begin::Custom Page -->
 		<?php if (isset($scripts)) : ?>
 			<?php foreach ($scripts as $script) : ?>
-				<script type="text/javascript" src="<?= base_url(); ?>assets/js/pages/custom/pages/<?= $script ?>.js?time=<?=date("YmdHis")?>"></script>
+				<script type="text/javascript" src="<?= base_url(); ?>assets/js/pages/custom/pages/<?= $script ?>.js?time=<?= eult_versi_aset('assets/js/pages/custom/pages/' . $script . '.js') ?>"></script>
 			<?php endforeach; ?>
 		<?php endif; ?>
 		<!--end::Custom Page -->

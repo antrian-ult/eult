@@ -254,7 +254,10 @@ class ModelMaster extends \CodeIgniter\Model
             ->orderBy('layananId');
 
         if (! empty($khusus)) {
-            $builder->where("(jenislayananId = '3' OR layananId in('9','12','32','45','78','88','110','27','28','29','146','150','168'))", null, false);
+            // Daftar layanan khusus dapat dioverride via .env
+            // (EULT_LAYANAN_KHUSUS, dipisah koma) tanpa mengubah kode.
+            $daftar = array_filter(array_map('trim', explode(',', (string) (env('EULT_LAYANAN_KHUSUS') ?: '9,12,32,45,78,88,110,27,28,29,146,150,168'))));
+            $builder->groupStart()->where('jenislayananId', 3)->orWhereIn('layananId', $daftar)->groupEnd();
         }
 
         $hasil = $builder->get()->getResultArray();

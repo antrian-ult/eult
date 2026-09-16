@@ -4,6 +4,15 @@ var KTValidasifile = function () {
     var tableFiles = null;
     var tableQuarantine = null;
 
+    // Nilai dari server (nama file, folder, status) di-escape sebelum
+    // diinterpolasi ke string HTML — nama file upload dikendalikan
+    // pengirim tiket sehingga tidak boleh dipercaya mentah.
+    var escHtml = function (value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    };
+
     var initTableFiles = function () {
         if (typeof $.fn.DataTable !== 'undefined' && $.fn.DataTable.isDataTable('#table-files')) {
             $('#table-files').DataTable().destroy();
@@ -33,9 +42,9 @@ var KTValidasifile = function () {
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
                         if (row.status === 'VALID') {
-                            return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" disabled class="row-check-file" value="${data}"><span></span></label>`;
+                            return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" disabled class="row-check-file" value="${escHtml(data)}"><span></span></label>`;
                         }
-                        return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" class="row-check-file" value="${data}"><span></span></label>`;
+                        return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" class="row-check-file" value="${escHtml(data)}"><span></span></label>`;
                     }
                 },
                 {
@@ -47,16 +56,17 @@ var KTValidasifile = function () {
                     data: 'filename',
                     className: 'align-middle font-weight-bold',
                     render: function (data, type, row) {
-                        var icon = data.endsWith('.pdf') ? '<i class="la la-file-pdf-o text-danger mr-1"></i>' : '<i class="la la-file-image-o text-primary mr-1"></i>';
-                        var tracking = row.tracking_id ? `<br><small class="text-muted">Tracking ID: <b>${row.tracking_id}</b></small>` : '';
-                        return `<div>${icon} <span class="text-dark">${data}</span>${tracking}</div>`;
+                        var nama = String(data == null ? '' : data);
+                        var icon = nama.toLowerCase().endsWith('.pdf') ? '<i class="la la-file-pdf-o text-danger mr-1"></i>' : '<i class="la la-file-image-o text-primary mr-1"></i>';
+                        var tracking = row.tracking_id ? `<br><small class="text-muted">Tracking ID: <b>${escHtml(row.tracking_id)}</b></small>` : '';
+                        return `<div>${icon} <span class="text-dark">${escHtml(nama)}</span>${tracking}</div>`;
                     }
                 },
                 {
                     data: 'status',
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
-                        return `<span class="badge ${row.badge_class}">${row.status_label}</span>`;
+                        return `<span class="badge ${escHtml(row.badge_class)}">${escHtml(row.status_label)}</span>`;
                     }
                 },
                 {
@@ -74,11 +84,12 @@ var KTValidasifile = function () {
                     orderable: false,
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
-                        var folder = row.folder || $('#select-folder').val();
-                        var btnPreview = `<button type="button" class="btn btn-sm btn-outline-info btn-icon btn-preview-file" data-file="${data}" data-folder="${folder}" data-quarantine="0" title="Preview"><i class="la la-eye"></i></button>`;
+                        var folder = escHtml(row.folder || $('#select-folder').val());
+                        var berkas = escHtml(data);
+                        var btnPreview = `<button type="button" class="btn btn-sm btn-outline-info btn-icon btn-preview-file" data-file="${berkas}" data-folder="${folder}" data-quarantine="0" title="Preview"><i class="la la-eye"></i></button>`;
                         var btnQuarantine = '';
                         if (row.status !== 'VALID') {
-                            btnQuarantine = `<button type="button" class="btn btn-sm btn-outline-warning btn-icon ml-1 btn-single-quarantine" data-file="${data}" data-folder="${folder}" title="Karantina"><i class="la la-lock"></i></button>`;
+                            btnQuarantine = `<button type="button" class="btn btn-sm btn-outline-warning btn-icon ml-1 btn-single-quarantine" data-file="${berkas}" data-folder="${folder}" title="Karantina"><i class="la la-lock"></i></button>`;
                         }
                         return `<div class="d-flex justify-content-center">${btnPreview} ${btnQuarantine}</div>`;
                     }
@@ -116,7 +127,7 @@ var KTValidasifile = function () {
                     orderable: false,
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
-                        return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" class="row-check-quarantine" value="${data}" data-folder="${row.folder}"><span></span></label>`;
+                        return `<label class="kt-checkbox kt-checkbox--single kt-checkbox--solid"><input type="checkbox" class="row-check-quarantine" value="${escHtml(data)}" data-folder="${escHtml(row.folder)}"><span></span></label>`;
                     }
                 },
                 {
@@ -131,16 +142,17 @@ var KTValidasifile = function () {
                     data: 'filename',
                     className: 'align-middle font-weight-bold',
                     render: function (data, type, row) {
-                        var icon = data.endsWith('.pdf') ? '<i class="la la-file-pdf-o text-danger mr-1"></i>' : '<i class="la la-file-image-o text-primary mr-1"></i>';
-                        var sha = row.sha256 ? `<br><small class="text-muted font-monospace" style="font-size: 10px;">SHA256: ${row.sha256.substring(0, 16)}...</small>` : '';
-                        return `<div>${icon} <span class="text-dark">${data}</span>${sha}</div>`;
+                        var nama = String(data == null ? '' : data);
+                        var icon = nama.toLowerCase().endsWith('.pdf') ? '<i class="la la-file-pdf-o text-danger mr-1"></i>' : '<i class="la la-file-image-o text-primary mr-1"></i>';
+                        var sha = row.sha256 ? `<br><small class="text-muted font-monospace" style="font-size: 10px;">SHA256: ${escHtml(String(row.sha256).substring(0, 16))}...</small>` : '';
+                        return `<div>${icon} <span class="text-dark">${escHtml(nama)}</span>${sha}</div>`;
                     }
                 },
                 {
                     data: 'folder',
                     className: 'text-center align-middle',
                     render: function (data) {
-                        return `<span class="badge badge-secondary">${data}</span>`;
+                        return `<span class="badge badge-secondary">${escHtml(data)}</span>`;
                     }
                 },
                 {
@@ -155,7 +167,7 @@ var KTValidasifile = function () {
                     data: 'quarantined_by',
                     className: 'text-center align-middle',
                     render: function (data) {
-                        return `<span class="badge badge-dark">${data || 'ADMIN'}</span>`;
+                        return `<span class="badge badge-dark">${escHtml(data || 'ADMIN')}</span>`;
                     }
                 },
                 {
@@ -163,9 +175,11 @@ var KTValidasifile = function () {
                     orderable: false,
                     className: 'text-center align-middle',
                     render: function (data, type, row) {
-                        var btnPreview = `<button type="button" class="btn btn-sm btn-outline-info btn-icon btn-preview-file" data-file="${data}" data-folder="${row.folder}" data-quarantine="1" title="Preview"><i class="la la-eye"></i></button>`;
-                        var btnRestore = `<button type="button" class="btn btn-sm btn-outline-success btn-icon ml-1 btn-single-restore" data-file="${data}" data-folder="${row.folder}" title="Pulihkan"><i class="la la-undo"></i></button>`;
-                        var btnDelete = `<button type="button" class="btn btn-sm btn-outline-danger btn-icon ml-1 btn-single-delete" data-file="${data}" data-folder="${row.folder}" title="Hapus Permanen"><i class="la la-trash"></i></button>`;
+                        var berkas = escHtml(data);
+                        var folder = escHtml(row.folder);
+                        var btnPreview = `<button type="button" class="btn btn-sm btn-outline-info btn-icon btn-preview-file" data-file="${berkas}" data-folder="${folder}" data-quarantine="1" title="Preview"><i class="la la-eye"></i></button>`;
+                        var btnRestore = `<button type="button" class="btn btn-sm btn-outline-success btn-icon ml-1 btn-single-restore" data-file="${berkas}" data-folder="${folder}" title="Pulihkan"><i class="la la-undo"></i></button>`;
+                        var btnDelete = `<button type="button" class="btn btn-sm btn-outline-danger btn-icon ml-1 btn-single-delete" data-file="${berkas}" data-folder="${folder}" title="Hapus Permanen"><i class="la la-trash"></i></button>`;
                         return `<div class="d-flex justify-content-center">${btnPreview} ${btnRestore} ${btnDelete}</div>`;
                     }
                 }
@@ -287,7 +301,7 @@ var KTValidasifile = function () {
             var folder = $(this).data('folder');
             var isQuarantine = $(this).data('quarantine');
 
-            var previewUrl = `${URL_PREVIEW}/${folder}/${filename}/${isQuarantine}`;
+            var previewUrl = `${URL_PREVIEW}/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}/${isQuarantine}`;
             $('#preview-filename').text(filename);
             $('#iframe-doc-preview').attr('src', previewUrl);
             $('#btn-open-external').attr('href', previewUrl);

@@ -150,49 +150,54 @@ class Login extends BaseController
             ]);
         }
 
-        $kodeAcak = eult_generate_kode();
-        $cek      = $this->tiket->getNumber($kodeAcak);
-        if (empty($cek)) {
-            $idTiket = $kodeAcak . '-' . sprintf('%03d', 1);
-        } else {
-            $idTiket = $kodeAcak . '-' . sprintf('%03d', (int) substr((string) $cek['ticketTrackingId'], -3) + 1);
-        }
-
         $nama     = (string) $this->request->getPost('ticketName');
         $email    = (string) $this->request->getPost('ticketEmail');
-        $arsipId  = str_replace('-', '', $idTiket);
-        $arsipBaru = eult_auto_increment('d_archive', 'archiveId', $arsipId, ['archiveTrackingId' => $idTiket]);
+        $kodeAcak = eult_generate_kode();
 
-        $konfig = [
-            'url'      => WRITEPATH . 'uploads/ticketing/',
-            'type'     => 'pdf',
-            'size'     => 20 * 1024,
-            'namafile' => 'TIKET_' . $arsipId . '_' . date('YmdHis'),
-        ];
+        // Alokasi nomor + insert dikunci per kode acak: dua permintaan
+        // bersamaan dengan kode sama bisa membaca urutan terakhir yang
+        // sama (read-then-write) dan menghasilkan ticketTrackingId ganda.
+        // Lihat ModelTicketing::kunciNomorTiket().
+        $this->tiket->kunciNomorTiket($kodeAcak);
 
-        $paramFile = [
-            'archiveId'         => $arsipBaru,
-            'archiveTrackingId' => $idTiket,
-            'archiveJenis'      => 'TIKET',
-        ];
+        try {
+            $idTiket   = $this->tiket->nomorTiketBerikutnya($kodeAcak);
+            $arsipId   = str_replace('-', '', $idTiket);
+            $arsipBaru = eult_auto_increment('d_archive', 'archiveId', $arsipId, ['archiveTrackingId' => $idTiket]);
 
-        $param = [
-            'ticketIdentitas'  => (string) $this->request->getPost('ticketIdentitas'),
-            'ticketName'       => $nama,
-            'ticketCategories' => (string) $this->request->getPost('ticketCategories'),
-            'ticketEmail'      => $email,
-            'ticketNoHp'       => (string) $this->request->getPost('ticketNoHp'),
-            'ticketSubject'    => (string) $this->request->getPost('ticketSubject'),
-            'ticketPriority'   => (string) $this->request->getPost('ticketPriority'),
-            'ticketMessage'    => (string) $this->request->getPost('ticketMessage'),
-            'ticketCreated'    => date('Y-m-d H:i:s'),
-            'ticketStatus'     => 1,
-            'ticketCreatedBy'  => '',
-            'ticketArchiveId'  => $arsipBaru,
-            'ticketTrackingId' => $idTiket,
-        ];
+            $konfig = [
+                'url'      => WRITEPATH . 'uploads/ticketing/',
+                'type'     => 'pdf',
+                'size'     => 20 * 1024,
+                'namafile' => 'TIKET_' . $arsipId . '_' . date('YmdHis'),
+            ];
 
-        $proses = $this->tiket->tambah('d_ticketing', $param);
+            $paramFile = [
+                'archiveId'         => $arsipBaru,
+                'archiveTrackingId' => $idTiket,
+                'archiveJenis'      => 'TIKET',
+            ];
+
+            $param = [
+                'ticketIdentitas'  => (string) $this->request->getPost('ticketIdentitas'),
+                'ticketName'       => $nama,
+                'ticketCategories' => (string) $this->request->getPost('ticketCategories'),
+                'ticketEmail'      => $email,
+                'ticketNoHp'       => (string) $this->request->getPost('ticketNoHp'),
+                'ticketSubject'    => (string) $this->request->getPost('ticketSubject'),
+                'ticketPriority'   => (string) $this->request->getPost('ticketPriority'),
+                'ticketMessage'    => (string) $this->request->getPost('ticketMessage'),
+                'ticketCreated'    => date('Y-m-d H:i:s'),
+                'ticketStatus'     => 1,
+                'ticketCreatedBy'  => '',
+                'ticketArchiveId'  => $arsipBaru,
+                'ticketTrackingId' => $idTiket,
+            ];
+
+            $proses = $this->tiket->tambah('d_ticketing', $param);
+        } finally {
+            $this->tiket->lepasKunciNomorTiket($kodeAcak);
+        }
 
         if ($proses && $this->request->getFile('ticketArchiveId') !== null && $this->request->getFile('ticketArchiveId')->getError() !== UPLOAD_ERR_NO_FILE) {
             eult_upload_ticket($konfig, $paramFile);

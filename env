@@ -67,3 +67,16 @@
 #--------------------------------------------------------------------
 
 # logger.threshold = 4
+
+#--------------------------------------------------------------------
+# DATA BISNIS EULT (opsional — nilai bawaan ada di kode)
+#--------------------------------------------------------------------
+
+# Pejabat penandatangan surat EKTMI (Ticketing::validasiEktm).
+# EULT_EKTMI_PEJABAT_NAMA = 'Nama Pejabat, Gelar'
+# EULT_EKTMI_PEJABAT_NIP = '19...'
+# EULT_EKTMI_PEJABAT_JABATAN = 'Koordinator Unit Layanan Terpadu'
+
+# Daftar ID layanan khusus untuk pemohon internal (ModelMaster::getLayanan),
+# dipisah koma.
+# EULT_LAYANAN_KHUSUS = '9,12,32,45,78,88,110,27,28,29,146,150,168'

@@ -58,7 +58,9 @@ if (empty($encKey) && !empty($trackingId) && $trackingId !== '-') {
     }
 }
 
-$closeUrl    = !empty($closeUrl) ? $closeUrl : (!empty($encKey) ? site_url('ticketing/close/' . $encKey) : '#');
+// Route ticketing/close memang tidak diporting dari CI3 (fitur tutup
+// tiket belum tersedia) — jangan pernah membangun URL ke route mati itu.
+$closeUrl    = !empty($closeUrl) ? $closeUrl : '#';
 $cetakTerima = $cetakterima ?? (!empty($encKey) ? site_url('ticketing/cetakterima/' . $encKey) : '#');
 $surveyUrl   = 'https://docs.google.com/forms/d/e/1FAIpQLSe4Q8KLdpwCwx7CI3-IfS_YgrtNpc-tHeH14Ss75CkXyTaqRQ/viewform';
 $archiveUrl  = $archive_url ?? false;

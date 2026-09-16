@@ -100,5 +100,6 @@ class Autoload extends AutoloadConfig
         'eult_waktu',
         'eult_password',
         'eult_aksi',
+        'eult_aset',
     ];
 }

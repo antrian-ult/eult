@@ -40,6 +40,12 @@ if (! function_exists('eult_upload_ticket')) {
             eult_message_kirim('Tipe file tidak diizinkan. Hanya: ' . $konfig['type'], 'error');
         }
 
+        // Ekstensi bisa dipalsukan dengan rename — cocokkan isi berkas
+        // (magic byte) dengan tipe yang diklaim.
+        if (! eult_upload_konten_valid($berkas, $ekstensi)) {
+            eult_message_kirim('Isi file tidak cocok dengan tipe ' . strtoupper($ekstensi) . '.', 'error');
+        }
+
         // Validasi ukuran (CI3 max_size dalam KB)
         if ($berkas->getSizeByUnit('kb') > $konfig['size']) {
             eult_message_kirim('Ukuran file melebihi batas ' . round($konfig['size'] / 1024) . ' MB.', 'error');
@@ -52,6 +58,35 @@ if (! function_exists('eult_upload_ticket')) {
         $model = new \App\Models\ModelMaster();
 
         return $model->tambah('d_archive', $paramArsip);
+    }
+}
+
+if (! function_exists('eult_upload_konten_valid')) {
+    /**
+     * Validasi isi berkas (magic byte) sesuai ekstensi yang diklaim:
+     * PDF wajib berawalan %PDF-, gambar wajib terbaca getimagesize().
+     * Ekstensi lain diperbolehkan (tidak ada magic byte yang dikenal).
+     */
+    function eult_upload_konten_valid(\CodeIgniter\HTTP\Files\UploadedFile $berkas, string $ekstensi): bool
+    {
+        if ($ekstensi === 'pdf') {
+            $fp = @fopen($berkas->getTempName(), 'rb');
+
+            if ($fp === false) {
+                return false;
+            }
+
+            $magic = (string) fread($fp, 5);
+            fclose($fp);
+
+            return $magic === '%PDF-';
+        }
+
+        if (in_array($ekstensi, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+            return @getimagesize($berkas->getTempName()) !== false;
+        }
+
+        return true;
     }
 }
 
@@ -85,6 +120,12 @@ if (! function_exists('eult_upload_custom')) {
         $ekstensi  = strtolower($berkas->getExtension());
         if (! in_array($ekstensi, $diizinkan, true)) {
             eult_message_kirim('Tipe file tidak diizinkan. Hanya: ' . $konfig['type'], 'error');
+        }
+
+        // Ekstensi bisa dipalsukan dengan rename — cocokkan isi berkas
+        // (magic byte) dengan tipe yang diklaim.
+        if (! eult_upload_konten_valid($berkas, $ekstensi)) {
+            eult_message_kirim('Isi file tidak cocok dengan tipe ' . strtoupper($ekstensi) . '.', 'error');
         }
 
         if ($berkas->getSizeByUnit('kb') > $konfig['size']) {

@@ -73,6 +73,9 @@ class Otentifikasi extends BaseController
         if ($this->dataSesi !== []) {
             $username = (string) $this->request->getPost('username');
             $this->masuk->ubah('s_user', ['susrLastLogin' => date('Y-m-d H:i:s')], ['susrNama' => $username]);
+            // Rotasi ID session pada saat eskalasi privilege (login) agar
+            // ID session pra-login tidak bisa dipakai untuk session fixation.
+            session()->regenerate();
             session()->set('logged_in', $this->dataSesi);
             log_message('debug', 'Otentifikasi sukses untuk {user}', ['user' => $username]);
         }

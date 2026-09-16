@@ -55,7 +55,9 @@ class Cektiket extends BaseController
             'history'     => $riwayat,
             'output_url'  => $output !== false ? site_url('cektiket/loadpdf') . '/' . $kunci : false,
             'save_url'    => site_url('cektiket/save_replies') . '/' . $kunci,
-            'close_url'   => site_url('cektiket/close') . '/' . $kunci,
+            // Route cektiket/close tidak pernah diporting dari CI3 (fitur
+            // tutup tiket belum tersedia) — jangan kirim URL ke route mati.
+            'close_url'   => '#',
             'load_attach' => site_url('cektiket/loadattach') . '/' . $kunci,
             'rating_url'  => site_url('cektiket/rating') . '/' . $kunci,
             'replies'     => $balasan,
@@ -144,13 +146,20 @@ class Cektiket extends BaseController
             ->get()->getRowArray() ?? false;
         $lampiran = $output !== false ? $output['archiveFile'] : false;
 
+        $terkirim = false;
+
         if ($datas !== false) {
-            $this->email->selesai((string) $datas['ticketEmail'], 'Berkas Permintaan EULT UNMUL #' . $nomorTiket, $datas, $lampiran);
+            $terkirim = $this->email->selesai((string) $datas['ticketEmail'], 'Berkas Permintaan EULT UNMUL #' . $nomorTiket, $datas, $lampiran);
         }
 
         if ($proses) {
             $this->response->setHeader(csrf_header(), csrf_hash());
-            eult_message_kirim('Terimakasih Telah Mengisi IKM, Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon Periksa Email Anda.', 'success');
+
+            if ($terkirim) {
+                eult_message_kirim('Terimakasih Telah Mengisi IKM, Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon Periksa Email Anda.', 'success');
+            }
+
+            eult_message_kirim('Penilaian tersimpan, tetapi berkas gagal dikirim via email. Silakan hubungi petugas.', 'error');
         }
 
         eult_message_kirim('Rating gagal disimpan.', 'error');

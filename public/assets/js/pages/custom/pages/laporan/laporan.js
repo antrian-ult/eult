@@ -57,7 +57,9 @@ const KTLaporan = function () {
             e.preventDefault();
             const valName = $(this).attr('data-name') || $(this).attr('val_name') || 'laporan';
             const table = $('#table_export');
-            if (!table.length || table.find('tbody tr').length === 0 || table.find('td[colspan]').length) {
+            // Hanya tbody yang diperiksa: <tfoot> total (varian layanan memakai
+            // colspan) bukan penanda tabel kosong.
+            if (!table.length || table.find('tbody tr').length === 0 || table.find('tbody td[colspan]').length) {
                 return;
             }
 

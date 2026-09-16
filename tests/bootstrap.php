@@ -34,6 +34,11 @@ require $paths->systemDirectory . '/Boot.php';
 // SEBELUM boot agar tidak fatal error sekunder saat menampilkan error.
 defined('FCPATH') || define('FCPATH', __DIR__ . '/../public/');
 
+// HOMEPATH/ROOTPATH didefinisikan oleh bootstrap standar CI4 namun tidak
+// oleh bootConsole(); test starter framework (mis. HealthTest) memakainya.
+defined('HOMEPATH') || define('HOMEPATH', __DIR__ . '/../');
+defined('ROOTPATH') || define('ROOTPATH', __DIR__ . '/../');
+
 CodeIgniter\Boot::bootConsole($paths);
 
 // Helper path constant yang dipakai beberapa test (upload dsb).

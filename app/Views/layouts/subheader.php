@@ -3,17 +3,17 @@
 <div class="kt-subheader  kt-grid__item" id="kt_subheader">
 	<div class="kt-container  kt-container--fluid ">
 		<div class="kt-subheader__main">
-			<h3 class="kt-subheader__title"><?= $page_judul ?? '' ?></h3>
+			<h3 class="kt-subheader__title"><?= esc($page_judul ?? '') ?></h3>
 			<?php if (isset($breadcrumb->susrmdgroupDisplay)) : ?>
 				<span class="kt-subheader__separator kt-subheader__separator--v"></span>
-				<span class="kt-subheader__desc"><?= $breadcrumb->susrmdgroupDisplay ?></span>
+				<span class="kt-subheader__desc"><?= esc($breadcrumb->susrmdgroupDisplay) ?></span>
 			<?php endif; ?>
 
 			<?php
 			if (isset($breadcrumb->susrmdgroupDisplay, $breadcrumb->susrmodulNamaDisplay) && $breadcrumb->susrmdgroupDisplay != $breadcrumb->susrmodulNamaDisplay) :
 				?>
 				<span class="kt-subheader__separator kt-subheader__separator--v"></span>
-				<span class="kt-subheader__desc"><?= $breadcrumb->susrmodulNamaDisplay ?></span>
+				<span class="kt-subheader__desc"><?= esc($breadcrumb->susrmodulNamaDisplay) ?></span>
 				<?php
 			endif;
 			?>
@@ -22,7 +22,7 @@
 			if (isset($status_page)) :
 				?>
 				<span class="kt-subheader__separator kt-subheader__separator--v"></span>
-				<span class="kt-subheader__desc"><?= $status_page ?></span>
+				<span class="kt-subheader__desc"><?= esc($status_page) ?></span>
 				<?php
 			endif;
 			?>
@@ -66,10 +66,10 @@
 										
         								<div class="kt-notification__item-details">
         									<div class="kt-notification__item-title">
-        										<?= $row['repliesTicketId'] ?>
-        										<br>
-												<?= $row['categoryNama'] ?>
-        										<span class="btn btn-success btn-sm btn-bold btn-font-md"><?= $row['jumlah'] ?> Pesan Baru</span>
+									<?= esc($row['repliesTicketId']) ?>
+										<br>
+										<?= esc($row['categoryNama']) ?>
+										<span class="btn btn-success btn-sm btn-bold btn-font-md"><?= esc($row['jumlah']) ?> Pesan Baru</span>
         									</div>
         								</div>
         							</a>

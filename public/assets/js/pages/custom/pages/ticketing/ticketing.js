@@ -8,6 +8,16 @@ const eultTerimaHtml = function (data) {
     return data;
 }
 
+// Notifikasi galat jaringan untuk handler error AJAX di file ini (default
+// global ada di eult-csrf.js; yang di sini juga memulihkan tombol).
+const eultAjaxGalat = () => {
+    swal.fire({
+        title: 'Kesalahan Jaringan',
+        text: 'Permintaan gagal dikirim. Periksa koneksi Anda lalu coba lagi.',
+        type: 'error'
+    });
+};
+
 const KTTicketing = function () {
     const main_form = $('#main_form');
     const initHandleWidgets = () => {
@@ -103,7 +113,6 @@ const KTTicketing = function () {
             }
             const formSimpan = $('#form_ticketing');
             const btnSimpan = $('#btn_save');
-            // const btnSelect = $("[name='ticketCategories']");
             const btnCheck = $('#btn_check');
             btnCheck.on('click', e => {
                 const $this = e.currentTarget;
@@ -113,7 +122,6 @@ const KTTicketing = function () {
                 $this.text = 'Sedang Memproses';
                 $this.disabled = true;
                 KTApp.progress($this);
-                console.log($_id);
                 if ($_id == '') {
                     swal.fire({
                         text: 'Silakan Isi Identitas',
@@ -156,27 +164,6 @@ const KTTicketing = function () {
                     });
                 }
             });
-            // btnSelect.on('change', e => {
-
-            //     $("#responseLayanan").html('');
-            //     e.preventDefault();
-            //     const val = e.currentTarget.value;
-            //     $.ajax({
-            //         type: 'POST',
-            //         url: '/ticketing/getKeperluan',
-            //         data: {
-            //             layanan: val
-            //         },
-            //         success: data => {
-            //             const res = (typeof data === 'string' ? JSON.parse(data) : data);
-            //             $(res).each((i, v) => {
-            //                 $("#responseLayanan").append(`
-            //                     <option value="${v.sCatId}">${v.sCatNama}</option>
-            //                     `);
-            //             });
-            //         }
-            //     });
-            // });
             formSimpan.validate({
                 rules: {
                     ticketIdentitas: {
@@ -227,7 +214,7 @@ const KTTicketing = function () {
                     }
                 }
             });
-            btnSimpan.on('click', e => {
+            btnSimpan.off('click').on('click', e => {
                 const dataSave = new FormData($(formSimpan)[0]);
                 const $this = e.currentTarget;
                 const title = status;
@@ -262,6 +249,11 @@ const KTTicketing = function () {
                                 });
                             }
 
+                        },
+                        error: () => {
+                            $($this).text('Save');
+                            KTApp.unprogress($this);
+                            eultAjaxGalat();
                         }
                     });
                 } else {
@@ -287,7 +279,6 @@ const KTTicketing = function () {
                     url: e.currentTarget.href,
                     data: formDeliver.serialize(),
                     success: data => {
-                        console.log(data)
                         window.open(`/ticketing/preview/${id}`, '_blank');
                     }
                 });
@@ -306,7 +297,7 @@ const KTTicketing = function () {
                     }
                 }
             });
-            btnSimpan.on('click', e => {
+            btnSimpan.off('click').on('click', e => {
                 const $this = e.currentTarget;
                 $($this).text('Sedang Menyimpan');
                 KTApp.progress($this);
@@ -321,7 +312,6 @@ const KTTicketing = function () {
                         url: formDeliver.attr('action'),
                         data: formDeliver.serialize(),
                         success: data => {
-                            console.log(data);
                             const eR = (typeof data === 'string' ? JSON.parse(data) : data);                            
                             if (eR.status != 'error') {
                                 swal.fire({
@@ -338,6 +328,11 @@ const KTTicketing = function () {
                             }
                             KTApp.unprogress($this);
                             $this.text = 'Save';
+                        },
+                        error: () => {
+                            KTApp.unprogress($this);
+                            $($this).text('Save');
+                            eultAjaxGalat();
                         }
                     });
                 } else {
@@ -373,7 +368,6 @@ const KTTicketing = function () {
                 // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
                 // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
                 var myVal = button.data('val')
-                console.log(myVal)
                 var modal = $(this)
                 modal.find("#f_nomor_surat").val(myVal)
                 modal.find('#f_nomor_tiket').val(keys)
@@ -385,7 +379,6 @@ const KTTicketing = function () {
                 // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
                 // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
 
-                console.log(keys);
                 var modal = $(this)
                 modal.find('#f_nomor_tiket_validasi').val(keys)
             })
@@ -396,7 +389,6 @@ const KTTicketing = function () {
                 // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
                 // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
 
-                console.log(keys);
                 var modal = $(this)
                 modal.find('#f_nomor_tiket_tolak').val(keys)
             })
@@ -411,7 +403,7 @@ const KTTicketing = function () {
             })                        
 
             const handleEventReject = () => {
-                $('#btn_save').on('click', e => {
+                $('#btn_save').off('click').on('click', e => {
                     e.preventDefault();
                     swal.fire({
                         title: "Apakah Anda Yakin Akan Menolak Tiket?",
@@ -775,7 +767,6 @@ const KTTicketing = function () {
                 });
             });
             btnTolak.on('click', e => {
-                console.log('swal');
                 e.preventDefault();
                 const url = $("#f_nomor_tiket_tolak").val();
                 const val = $("#f_pesan_tolak").val();
@@ -815,24 +806,6 @@ const KTTicketing = function () {
                     })
                 }
             });
-            // const handleEventEdit = () => {
-            //     const val = $("[name='ticketCategories']").val();
-            //     $.ajax({
-            //         type: 'POST',
-            //         url: '/ticketing/getKeperluan',
-            //         data: {
-            //             layanan: val
-            //         },
-            //         success: data => {
-            //             const res = (typeof data === 'string' ? JSON.parse(data) : data);
-            //             $(res).each((i, v) => {
-            //                 $("#responseLayanan").append(`
-            //                     <option value="${v.sCatId}">${v.sCatNama}</option>
-            //                     `);
-            //             });
-            //         }
-            //     });
-            // }
             const handleEventValidate = () => {
                 const form = $('#form_tandatangan');
                 const btnSimpan = $('#btn_save');
@@ -841,7 +814,7 @@ const KTTicketing = function () {
                         ticketMessage: "required"
                     }
                 });
-                btnSimpan.on('click', e => {
+                btnSimpan.off('click').on('click', e => {
                     if (form.valid()) {
                         const dataSave = new FormData($(form)[0]);
                         e.preventDefault();
@@ -886,7 +859,7 @@ const KTTicketing = function () {
                         ticketPriority: "required"
                     }
                 });
-                btnSimpan.on('click', e => {
+                btnSimpan.off('click').on('click', e => {
                     const dataSave = new FormData($(formAssign)[0]);
                     const $this = e.currentTarget;
                     e.preventDefault();
@@ -920,6 +893,11 @@ const KTTicketing = function () {
                                     });
                                 }
 
+                            },
+                            error: () => {
+                                $($this).text('Save');
+                                KTApp.unprogress($this);
+                                eultAjaxGalat();
                             }
                         });
                     } else {
@@ -978,7 +956,9 @@ const KTTicketing = function () {
             }
         });
         $('.kv-uni-star').on('change', function () {
-            const ticketId = $('#ticketId').text();
+            // Teks #ticketId mengandung newline + indentasi markup — pangkas
+            // agar cocok eksak dengan ticketTrackingId di database.
+            const ticketId = $('#ticketId').text().trim();
             $.ajax({
                 type: 'POST',
                 url: '/ticketing/rating',
@@ -987,14 +967,29 @@ const KTTicketing = function () {
                     nomorTiket: ticketId
                 },
                 success: data => {
-                     console.log(data);
-                     swal.fire({
-                                title: "Indeks Kepuasan Masyarakat",
-                                text: 'Terimakasih Telah Mengisi IKM, Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon Periksa Email Anda!',
-                                type: 'success'
-                            }).then(function () {
-                                    location.reload()
-                                });     
+                    var res = (typeof data === 'string' ? JSON.parse(data) : data);
+                    if (!res || res.status !== 'success') {
+                        swal.fire({
+                            title: "Indeks Kepuasan Masyarakat",
+                            text: (res && res.message) || 'Gagal menyimpan penilaian. Silakan coba kembali.',
+                            type: 'error'
+                        });
+                        return;
+                    }
+                    swal.fire({
+                        title: "Indeks Kepuasan Masyarakat",
+                        text: res.message || 'Terima kasih telah mengisi IKM.',
+                        type: 'success'
+                    }).then(function () {
+                        location.reload()
+                    });
+                },
+                error: () => {
+                    swal.fire({
+                        title: "Indeks Kepuasan Masyarakat",
+                        text: 'Gagal menyimpan penilaian. Silakan coba kembali.',
+                        type: 'error'
+                    });
                 }
             });
         });
@@ -1008,7 +1003,8 @@ const KTTicketing = function () {
             e.preventDefault();
 
             const table = $('#table_ticketing');
-            if (!table.length || table.find('tbody tr').length === 0 || table.find('td[colspan]').length) {
+            // Hanya tbody yang diperiksa (pola yang sama dengan laporan.js).
+            if (!table.length || table.find('tbody tr').length === 0 || table.find('tbody td[colspan]').length) {
                 swal.fire({
                     title: 'Tidak Ada Data',
                     text: 'Tampilkan daftar tiket terlebih dahulu sebelum mengekspor.',

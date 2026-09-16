@@ -2406,11 +2406,11 @@
     <!--begin::Global Theme Bundle(used by all pages) -->
     <script src="<?= base_url(); ?>assets/plugins/global/plugins.bundle.js" type="text/javascript"></script>
     <script src="<?= base_url(); ?>assets/js/scripts.bundle.js" type="text/javascript"></script>
-    <script src="<?= base_url(); ?>assets/js/pages/eult-csrf.js?v=20260915" type="text/javascript"></script>
+    <script src="<?= base_url(); ?>assets/js/pages/eult-csrf.js?v=<?= eult_versi_aset('assets/js/pages/eult-csrf.js') ?>" type="text/javascript"></script>
     <!--end::Global Theme Bundle -->
 
     <!--begin::Page Scripts(used by this page) -->
-    <script src="<?= base_url(); ?>assets/js/pages/custom/pages/user/login.js?v=20260913i" type="text/javascript"></script>
+    <script src="<?= base_url(); ?>assets/js/pages/custom/pages/user/login.js?v=<?= eult_versi_aset('assets/js/pages/custom/pages/user/login.js') ?>" type="text/javascript"></script>
     <!--end::Page Scripts -->
 
     <!--begin::Delight Navigation Controller & Feedback Scripts -->

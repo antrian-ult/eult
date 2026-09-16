@@ -17,6 +17,8 @@ $ratingNilai  = $datas['ratingNilai'] ?? '';
 $sudahRating  = ! empty($datas['ratingTicketId']);
 $outputUrl    = $output_url ?? false;
 $saveUrl      = $save_url ?? site_url('cektiket/save_replies/');
+// Route close tiket tidak pernah diporting dari CI3 — controller selalu
+// mengirim '#', tidak ada URL route mati yang dibangun di sini.
 $closeUrl     = $close_url ?? '#';
 $loadAttach   = $load_attach ?? site_url('cektiket/loadattach');
 $ratingUrl    = $rating_url ?? site_url('cektiket/rating');
@@ -988,10 +990,23 @@ $labelStatusLive = $selesai ? 'Selesai' : ($ditolak ? 'Tidak dilanjutkan' : 'Dal
                                 $('meta[name="<?= esc(csrf_header(), 'attr') ?>"]').attr('content', tokenBaru);
                             }
 
+                            // Respons error memakai HTTP 200 — periksa statusnya
+                            // agar kegagalan tidak tampil sebagai sukses.
+                            let hasil = null;
+                            try {
+                                hasil = (typeof response === 'string' ? JSON.parse(response) : response);
+                            } catch (e) {
+                                hasil = null;
+                            }
+                            if (!hasil || hasil.status !== 'success') {
+                                tampilkanToast((hasil && hasil.message) || 'Gagal menyimpan penilaian. Silakan coba kembali.');
+                                return;
+                            }
+
                             if (typeof swal !== 'undefined' && swal.fire) {
                                 swal.fire({
                                     title: "Indeks Kepuasan Masyarakat",
-                                    text: 'Terima kasih telah mengisi IKM. Untuk layanan dengan permintaan berkas, berkas telah kami kirimkan via email. Mohon periksa email Anda.',
+                                    text: (hasil && hasil.message) || 'Terima kasih telah mengisi IKM.',
                                     type: 'success'
                                 }).then(function() {
                                     location.reload();

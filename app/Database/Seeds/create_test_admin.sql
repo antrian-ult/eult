@@ -1,15 +1,17 @@
 -- ============================================================
--- SCRIPT: Buat akun admin test sementara untuk QA/Impeccable
--- DB Target: db_newtiket (production)
+-- SCRIPT: Buat akun admin test sementara untuk QA
+-- DB Target: db_newtiket
 -- Dibuat: 2026-09-13
 -- ============================================================
--- PERHATIAN: Hapus akun ini setelah sesi QA selesai!
--- Jalankan bagian DROP di bawah untuk menghapusnya.
+-- PERINGATAN:
+-- 1. JANGAN jalankan script ini di database produksi.
+-- 2. Hapus akun ini setelah sesi QA selesai (bagian [2] di bawah).
+-- 3. Password akun test TIDAK disimpan plaintext di repo — ganti
+--    hash di bawah bila perlu (buat via:
+--    php -r "echo password_hash('<password>', PASSWORD_DEFAULT);").
 -- ============================================================
 
 -- [1] BUAT AKUN TEST
--- Password plaintext: Impeccable@2026!
--- Hash bcrypt dibuat via: php -r "echo password_hash('Impeccable@2026!', PASSWORD_DEFAULT);"
 INSERT INTO `s_user`
   (`susrNama`, `susrPassword`, `susrSgroupNama`, `susrProfil`, `susrPertanyaan`, `susrJawaban`, `susrAvatar`, `susrRefIndex`, `susrLastLogin`, `susrCategoryId`)
 VALUES

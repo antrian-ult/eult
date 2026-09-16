@@ -174,19 +174,33 @@ class Validasifile extends BaseController
 
         $lokasi = WRITEPATH . 'uploads/' . ($karantina === '1' ? '_quarantine/' : '') . $folder . '/' . $namaFile;
 
+        // CR/LF tidak mungkin lolos basename() pada Linux — tetap ditolak
+        // eksplisit agar tidak pernah sampai ke header Content-Disposition.
+        if (preg_match('/[\r\n]/', $namaFile)) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
         if (! is_file($lokasi)) {
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
         }
 
+        // Hanya tipe yang dikenal yang disajikan; ekstensi lain ditolak
+        // (bukan diberi fallback octet-stream) agar preview tidak jadi
+        // jalur penyajian file arbitrer.
         $tipe = [
             'pdf' => 'application/pdf', 'png' => 'image/png',
             'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif',
-        ][strtolower(pathinfo($namaFile, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
+        ][strtolower(pathinfo($namaFile, PATHINFO_EXTENSION))] ?? null;
+
+        if ($tipe === null) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
 
         return $this->response
             ->setHeader('Content-Type', $tipe)
             ->setHeader('Content-Disposition', 'inline; filename="' . $namaFile . '"')
             ->setHeader('Content-Length', (string) filesize($lokasi))
+            ->setHeader('X-Content-Type-Options', 'nosniff')
             ->setBody(file_get_contents($lokasi));
     }
 }

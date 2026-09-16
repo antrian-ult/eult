@@ -37,6 +37,32 @@
         }
     };
 
+    // Handler error default untuk semua AJAX jQuery yang tidak punya
+    // callback error sendiri — sebelumnya kegagalan jaringan/server total
+    // tak terlihat (tombol "Sedang Menyimpan" menggantung tanpa notifikasi).
+    // Callback error eksplisit tidak terpengaruh (ajaxSetup hanya nilai
+    // default).
+    $.ajaxSetup({
+        error: function (xhr) {
+            if (typeof swal === 'undefined') {
+                return;
+            }
+            if (xhr && (xhr.status === 403 || xhr.status === 419)) {
+                swal.fire({
+                    title: 'Sesi Berakhir',
+                    text: 'Sesi Anda telah berakhir atau token keamanan kedaluwarsa. Silakan muat ulang halaman dan masuk kembali.',
+                    type: 'warning'
+                });
+                return;
+            }
+            swal.fire({
+                title: 'Kesalahan Jaringan',
+                text: 'Permintaan gagal diproses. Periksa koneksi lalu coba lagi, atau muat ulang halaman.',
+                type: 'error'
+            });
+        }
+    });
+
     $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
         var method = (options.type || options.method || 'GET').toUpperCase();
         if (method === 'GET' || method === 'HEAD' || options.crossDomain) {

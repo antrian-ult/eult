@@ -25,6 +25,10 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Fail-fast bila dependensi produksi memiliki advisory CVE aktif.
+      - name: Audit dependencies (CVE)
+        run: composer audit --no-dev --no-interaction
+
       - name: Lint PHP
         run: find app tests -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 

@@ -36,6 +36,42 @@ class ModelTicketing extends ModelMaster
         return $baris ?? false;
     }
 
+    /**
+     * Nomor tiket berikutnya untuk kode acak (konsolidasi logika yang
+     * sebelumnya terduplikasi di Login::savetiket dan Ticketing::save).
+     */
+    public function nomorTiketBerikutnya(string $kodeAcak): string
+    {
+        $cek = $this->getNumber($kodeAcak);
+
+        return $kodeAcak . '-' . sprintf('%03d', empty($cek) ? 1 : (int) substr((string) $cek['ticketTrackingId'], -3) + 1);
+    }
+
+    /**
+     * Named lock MySQL yang menserialisasi pasangan alokasi-nomor + insert
+     * untuk kode acak yang sama. Tanpa ini dua permintaan bersamaan bisa
+     * sama-sama membaca urutan terakhir yang sama lewat getNumber() lalu
+     * menghasilkan ticketTrackingId ganda (read-then-write race).
+     * Driver selain MySQLi (mis. SQLite pada pengujian) menjadi no-op.
+     */
+    public function kunciNomorTiket(string $kodeAcak): void
+    {
+        $db = $this->dbAktif();
+
+        if ($db->DBDriver === 'MySQLi') {
+            $db->query('SELECT GET_LOCK(?, 10)', ['eult_nomor_' . $kodeAcak]);
+        }
+    }
+
+    public function lepasKunciNomorTiket(string $kodeAcak): void
+    {
+        $db = $this->dbAktif();
+
+        if ($db->DBDriver === 'MySQLi') {
+            $db->query('SELECT RELEASE_LOCK(?)', ['eult_nomor_' . $kodeAcak]);
+        }
+    }
+
     public function getSurat(array|string $kondisi): array|false
     {
         $baris = $this->db->table('d_ticketing')

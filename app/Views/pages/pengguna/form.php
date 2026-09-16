@@ -13,7 +13,7 @@
                 <div class="kt-portlet__head">
                     <div class="kt-portlet__head-label">
                         <h3 class="kt-portlet__head-title">
-                            <?= strtoupper($page_judul) ?>
+                            <?= esc(strtoupper($page_judul ?? '')) ?>
                         </h3>
                     </div>
                 </div>
@@ -22,11 +22,11 @@
                 <form class="kt-form" action="<?= $save_url ?>" method="post" id="form_custom">
                     <?= csrf_field() ?>
                     <div class="kt-portlet__body">
-                        <input type="hidden" name="susrNamaOld" value="<?= $datas != false ? $datas['susrNama'] : '' ?>">
+                            <input type="hidden" name="susrNamaOld" value="<?= esc($datas != false ? $datas['susrNama'] : '') ?>">
 
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" class="form-control" name="susrNama" placeholder="Username" aria-describedby="Username" value="<?= $datas != false ? $datas['susrNama'] : '' ?>">
+                            <input type="text" class="form-control" name="susrNama" placeholder="Username" aria-describedby="Username" value="<?= esc($datas != false ? $datas['susrNama'] : '') ?>">
                         </div>
 
                         <div class="form-group">
@@ -35,7 +35,8 @@
                                 <option value=""></option>
                                 <?php
                                 foreach ($s_user_group as $row) :
-                                    echo '<option value="' . $row['sgroupNama'] . '" ' . ($datas != false ? $datas['susrSgroupNama'] == $row['sgroupNama'] ? 'selected' : '' : '') . '>' . $row['sgroupNama'] .' ( '.$row['sgroupKeterangan'].')'. '</option>';
+                                    $terpilih = $datas != false && $datas['susrSgroupNama'] == $row['sgroupNama'] ? 'selected' : '';
+                                    echo '<option value="' . esc($row['sgroupNama']) . '" ' . $terpilih . '>' . esc($row['sgroupNama'] . ' ( ' . $row['sgroupKeterangan'] . ')') . '</option>';
                                 endforeach;
                                 ?>
                             </select>
@@ -44,7 +45,7 @@
                          
                         <div class="form-group">
                             <label>Profile Name</label>
-                            <input type="text" class="form-control" name="susrProfil" placeholder="Profile Name" aria-describedby="Profile Name" value="<?= $datas != false ? $datas['susrProfil'] : '' ?>">
+                            <input type="text" class="form-control" name="susrProfil" placeholder="Profile Name" aria-describedby="Profile Name" value="<?= esc($datas != false ? $datas['susrProfil'] : '') ?>">
                         </div>
 
                     </div>
